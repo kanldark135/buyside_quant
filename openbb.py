@@ -5,3 +5,5 @@ import seaborn as sn
 from openbb_terminal.sdk import openbb
 
 openbb.stocks.options.chains('AAPL')
+
+treasury = openbb.fixedincome.treasury()
