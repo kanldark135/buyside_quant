@@ -82,5 +82,3 @@ mix_ret_cum = mix_cum[-1]
 mix_cagr = np.power((1 + mix_ret_cum), 252/len(mix_cum.index)) - 1
 mix_vol = np.std(mix_ret) * np.sqrt(252)
 mix_sharpe = (mix_cagr - rf) / mix_vol
-
-# %%
