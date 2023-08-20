@@ -25,7 +25,7 @@ df_ret = df.pct_change(1)
 #2. params_annualized
 
 cov_matrix = df_ret.cov() * 252
-weight_vectors = np.zeros(shape = len(stocks)) 
+weight_vectors = np.zeros(shape = len(stocks))
 mean_ret = df_ret.mean() * 252
 std_ret = df_ret.std() * np.sqrt(252)
 sharpe = mean_ret / std_ret
@@ -37,12 +37,16 @@ def min_var(weight_vector, cov_matrix):
 
 def max_ret(weight_vector, mean_ret):
     res = np.matmul(weight_vector, mean_ret.values).sum()
-    return res
+    return - res
 
-def balance_btwn(weight_vector, cov_matrix, bnd_ret):
+def max_sharpe(weight_vector, cov_matrix, bnd_ret):
     pass
 
+# min_var
+min_var_res = sciop.minimize(min_var, weight_vectors, args = (cov_matrix), bounds = [(0, 1) for x in stocks], constraints = {'type' : 'eq', 'fun' : lambda x : sum(x) - 1})
+min_var_ret = np.matmul(mean_ret, min_var_res.x)
+min_var_var = min_var_res.fun
 
-sciop.minimize(min_var, weight_vectors, args = (cov_matrix), bounds = [(0, 1) for x in stocks], constraints = {'type' : 'eq', 'fun' : lambda x : sum(x) - 1})
+# sharpe_max
 
 
