@@ -8,12 +8,9 @@ import datetime as dt
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 
-## recession
 
 start_date = '1970-01-01'
 end_date = '2023-08-01'
-
-
 
 # # 1 > time series model - markov regression 
 

@@ -16,11 +16,8 @@ token = os.environ.get('OPENBB_TOKEN')
 openbb.login(email, password, token)
 
 # # set apikey to certain api provider
-openbb.keys.alphavantage("RZNGCMVQ77C1RPF2", persist = True)
+# openbb.keys.alphavantage("RZNGCMVQ77C1RPF2", persist = True)
 # openbb.keys.finnhub("cj6g7nhr01ql0ntir2s0cj6g7nhr01ql0ntir2sg", persist = True)
 
 
 #%%
-
-res = openbb.stocks.screener.screener_data('new_high')
-tickers = r

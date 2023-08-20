@@ -53,32 +53,3 @@ def us_treasury(dict, start_date = None):
 
 if __name__ == "__main__":
     rate = us_treasury(dict_interest_rate)
-
-#%% 
-
-import FinanceDataReader as fdr
-import pandas as pd
-import numpy as np
-
-start_date = '2004-01-01'
-end_date = '2021-09-30'
-rf = 0
-
-spy = fdr.DataReader("SPY", start = start_date, end = end_date)
-spy_ret = spy['Adj Close'].pct_change(1).fillna(0)
-spy_cum = (1 + spy_ret).cumprod() - 1
-
-agg = fdr.DataReader("AGG", start = start_date, end = end_date)
-agg_ret = agg['Adj Close'].pct_change(1).fillna(0)
-agg_cum = (1 + agg_ret).cumprod() - 1
-
-w_spy = 0.6
-w_agg = 0.4
-
-mix_ret = spy_ret * w_spy + agg_ret * w_agg
-mix_cum = (1 + mix_ret).cumprod() - 1
-
-mix_ret_cum = mix_cum[-1]
-mix_cagr = np.power((1 + mix_ret_cum), 252/len(mix_cum.index)) - 1
-mix_vol = np.std(mix_ret) * np.sqrt(252)
-mix_sharpe = (mix_cagr - rf) / mix_vol
