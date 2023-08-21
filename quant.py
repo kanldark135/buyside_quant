@@ -1,65 +1,65 @@
 import pandas as pd
 import numpy as np
 
-class measure:
 
-    def __init__(self, df):
+def sort(df):
 
+    try:
+        df = df['Adj Close']
+    except KeyError:
         try:
-            self.df = df['Adj Close']
+            potential_column_name = ['Close', "Price", "Last_Price"]
+            df = df[df.columns.isin(potential_column_name)]
+
         except KeyError:
-            try:
-                potential_column_name = ['Close', "Price", "Last_Price"]
-                self.df = df[df.columns.isin(potential_column_name)]
 
-            except KeyError:
+            if len(df.columns) == 1:
+                df = df
+            else:
+                raise KeyError("Adj Close / Close / Last_Price 형태의 종가가 dataframe 에 존재하도록 하거나 그냥 종가 한줄 넣으세요")
 
-                if len(df.columns) == 1:
-                    self.df = df
-                else:
-                    raise KeyError("Adj Close / Close / Last_Price 형태의 종가가 dataframe 에 존재하도록 하거나 그냥 종가 한줄 넣으세요")
+    return df
 
-        df.columns = ['close']
+def df_cumret(df):
+    ret = df.pct_change(1).iloc[1:]
+    cumret = (ret + 1).cumprod()
+    return cumret
 
-        self.ret = self.df.pct_change(1).iloc[1:]
-        self.cumret = (self.ret + 1).cumprod()
+def cagr(df):
+    ''' df is adj price, annualize by 252 days'''
+    ret = df.pct_change(1).iloc[1:]
+    cumret = (ret + 1).cumprod()
+    cagr = cumret[-1] ** (252 / len(ret)) - 1
+    return cagr
 
-    def cagr(self):
-        ''' df is adj price'''
-        cagr = self.cumret[-1] ** (252 / len(self.ret)) - 1
-       
-        return cagr
+def df_drawdown(df):
+    drawdown = df/ df.cummax() - 1
+    return drawdown
+
+def mdd(df):
+    drawdown = df / df.cummax() - 1
+    mdd_rolling = drawdown.cummin()
+    mdd = mdd_rolling.min()
+    return mdd
+
+def annual_vol(df):
+    ret = df.pct_change(1).iloc[1:]
+    vol = ret.std() * np.sqrt(252)
+    return vol
     
-    def df_drawdown(self):
-        drawdown = self.df/ self.df.expanding().max() - 1
-        return drawdown
+def sharpe(df):
+    ''' monthly arithmetic return / monthly stdev -> : following Morningstar Method '''
+    ret = df.pct_change(1).iloc[1:]
+    monthly_ret = (ret + 1).resample("M").prod() - 1
+    sharpe = monthly_ret.mean() / monthly_ret.std()
+    return sharpe
 
-    def mdd(self):
-        historical_max = self.df.cummax()
-        drawdown_from_histmax = self.df / historical_max - 1
-        mdd_rolling = drawdown_from_histmax.cummin()
-        mdd = mdd_rolling.min()
-
-        return mdd
-
-    def annual_vol(self):
-        vol = self.ret.std() * np.sqrt(252)
-        
-        return vol
-        
-    def sharpe(self):
-
-        # monthly return based approach : following Morningstar Method
-
-        monthly_ret = (self.ret + 1).resample("M").prod() - 1
-        sharpe = monthly_ret.mean() / monthly_ret.std()
-        return sharpe
+def calmar(df):
+    res = cagr(df) / mdd(df)
+    return res
     
-    def calmar(self):
 
-        res = self.cagr() / self.mdd()
-        return res
-    
+
 
 class ta:
 
