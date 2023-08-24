@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 
-def sort(df):
+def close_only(df):
     try:
         df = df['Adj Close']
     except KeyError:
@@ -106,7 +106,7 @@ class ta:
         
         # ohlc 던 close only던 df_price feed 하면 종가만 튀어나오게 수정
 
-        self.df = sort(df)
+        self.df = close_only(df)
         self.ret = self.df.pct_change(1).iloc[1:]
         self.cumret = (self.ret + 1).cumprod()
 
