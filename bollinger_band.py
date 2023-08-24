@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import quant
 
-spy = openbb.stocks.load('SPY')
+spy = openbb.stocks.load('SPY', start_date = '2010-01-01')
 ta = quant.ta(spy)
 
 df = ta.bollinger_band(days = 20, width = 2)
@@ -17,7 +17,7 @@ df['trade'] = 0
 
 # 간단한 볼린저 전략 : 상/하단 돌파시 역방향 매매 -> 중심선 도달시 청산 
 
-def trades(df, lagging = 1):
+def simple_bb(df, lagging = 1):
     df_prev = df.shift(lagging)
     for i in df.index:
         prev_position = df.shift(1).loc[i, 'trade']
@@ -37,8 +37,16 @@ def trades(df, lagging = 1):
             else:
                 df.loc[i, 'trade'] = prev_position
 
+    # 시그널 나면 종가에 매매하는 느낌이므로 실제 포지션 홀딩은 다음날부터 : trade -> trade.shift(1) 해야함
+    df['trade'] = df['trade'].shift(1)
+
     return df
 
-res = trades(df)
+res = simple_bb(df)
 
-def 
+def get_return(df):
+    daily_ret = df['close'].pct_change(1) * df['trade']
+    cumret = (daily_ret + 1).cumprod() - 1
+    return dict(daily = daily_ret, cum = cumret)
+    
+sharpe = quant.sharpe()
