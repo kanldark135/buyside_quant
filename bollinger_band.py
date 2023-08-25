@@ -17,7 +17,7 @@ df['trade'] = 0
 
 # 간단한 볼린저 전략 : 상/하단 돌파시 역방향 매매 -> 중심선 도달시 청산 
 
-def simple_bb(df, lagging = 1):
+def put_trade(df, lagging = 1):
     df_prev = df.shift(lagging)
     for i in df.index:
         prev_position = df.shift(1).loc[i, 'trade']
@@ -42,7 +42,7 @@ def simple_bb(df, lagging = 1):
 
     return df
 
-res = simple_bb(df)
+res = put_trade(df)
 
 def get_return(df):
     daily_ret = df['close'].pct_change(1) * df['trade']
