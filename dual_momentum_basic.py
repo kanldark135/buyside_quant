@@ -8,28 +8,30 @@ import pandas as pd
 import numpy as np
 from datetime import datetime as dt
 
+df_stocks = pd.DataFrame()
 
 start_date = '2010-01-01'
 stocks = ['SPY', 'AAPL', 'MSFT', 'TLT', 'JPM', 'BAC', 'MRNA', 'META', 'WMT']
 for i in stocks:
 
     df_raw = openbb.stocks.load(i, start_date = start_date)
-    df = quant.close_only(df_raw)
-    
-df = util.extract_last_price(df)
+    df = quant.close_only(df_raw, column_rename = i)
+    df = util.extract_last_price(df)
+    df_stocks = pd.concat([df_stocks, df], axis = 1)
 
 
-# momentum 계산
+# momentum_score 계산
 
 def momentum(df, list_months : list = [1, 3, 6, 12]):
 
     ''' 일단 n-month 수익률로만 진행 '''
+    df_dummy = pd.DataFrame()
 
     for i in list_months:
-        df[f"ret_{i}"] = df['close'].pct_change(i)
+        df_dummy[f"ret_{i}"] = df.pct_change(i)
 
     dummy = list(reversed(list_months))
-    res = df.loc[:, f'ret_{list_months[0]}': ].mul(dummy, axis = 1)
+    res = df_dummy.loc[:, f'ret_{list_months[0]}': ].mul(dummy, axis = 1)
 
     res = res.sum(axis = 1) / sum(list_months)
 

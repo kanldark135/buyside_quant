@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 
-def close_only(df):
+def close_only(df, column_rename = 'close'):
     try:
         df = df['Adj Close']
     except KeyError:
@@ -18,7 +18,7 @@ def close_only(df):
                 raise KeyError("Adj Close / Close / Last_Price 형태의 종가가 dataframe 에 존재하도록 하거나 그냥 종가 한줄 넣으세요")
     
     df = df.to_frame()
-    df.columns = ['close']
+    df.columns = [column_rename]
     return df
 
 def df_cumret(df, is_ret = False):
