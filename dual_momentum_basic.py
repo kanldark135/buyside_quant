@@ -3,6 +3,7 @@ import FinanceDataReader as fdr
 
 import quant
 import util
+import backtesting as bt
 import pandas as pd
 import numpy as np
 from datetime import datetime as dt
@@ -20,7 +21,7 @@ df = util.extract_last_price(df)
 
 # momentum 계산
 
-def calc_momentum(df, list_months : list = [1, 3, 6, 12]):
+def momentum(df, list_months : list = [1, 3, 6, 12]):
 
     ''' 일단 n-month 수익률로만 진행 '''
 
@@ -30,19 +31,42 @@ def calc_momentum(df, list_months : list = [1, 3, 6, 12]):
     dummy = list(reversed(list_months))
     res = df.loc[:, f'ret_{list_months[0]}': ].mul(dummy, axis = 1)
 
-    df['momentum_score'] = res.sum(axis = 1) / sum(list_months)
+    res = res.sum(axis = 1) / sum(list_months)
 
-    # absolute momentum
-
-    df = df.assign(abs_momentum = np.where(df.momentum_score > 0, 1, 0))
+    return res
     
+
+
+
+def put_trade(df : pd.DataFrame):
+    
+    df['trade'] = 0
+
+    for i in df.index:
+        prev_position = df['trade'].shift(1).loc[i]
+
+        if prev_position == 0: # 이전에 무포지션이면,
+            if df.loc[i, 'abs_momentum'] == 1: # 모멘텀 1이면
+                df.loc[i, 'trade'] = 1 # 매수
+            else:
+                df.loc[i, 'trade'] = prev_position # 아니면 패스
+
+        elif prev_position != 0: # 이전에 포지션 있으면
+            if df.loc[i, 'abs_momentum']  == 0: # 모멘텀 0이면
+                df.loc[i, 'trade'] = 0 # 청산
+            else:
+                df.loc[i, 'trade'] = prev_position # 기존 포지션 유지
+            
+    # 2) 결과론적인 성과평가이므로 trade 는 종가에 들어갔다고 가정 -> 실제 성과는 한 row씩 shift
+
+    df['trade'] = df['trade'].shift(1)
+
     return df
 
+res = df.pipe(abs_momentum).pipe(put_trade)
 
-df['trade'] = 0
-
-def put_trade(df):
-    prev_position = df.shift(1)
-    if prev_position != 0:
-        if df.abs_momentum == 1:
-            df['trade'] == 1
+def get_return(df):
+    daily_ret = df['close'].pct_change(1) * df['trade']
+    cumret = quant.df_cumret(daily_ret, is_ret = True)
+    return cumret
+    
