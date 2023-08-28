@@ -15,7 +15,7 @@ sphb = quant.close_only(sphb).rename(columns = {'close': 'sphb'})
 
 ## high vol condition
 
-def hold_usmv(df_vix, vix_quantile = 0.8, spike = 10, interval = 20):
+def hold_usmv(df_vix, vix_quantile = 0.8, interval = 252):
     '''logic : 
     1) 변동성 많이 높으면 -> 떨어질만큼 떨어졌으므로 되려 반등 노리고 high beta / 반대로 vix 일정 이하면 low beta 유지
     2) but VIX 꺾이는건 보고 들어가야... 안그러면 더 조질 수 있음 -> vix가 new high 일때는 low beta 유지
@@ -25,22 +25,25 @@ def hold_usmv(df_vix, vix_quantile = 0.8, spike = 10, interval = 20):
     # 1. vix is lower than n-th quantile
     cond_1 = df['vix'] < df['vix'].quantile(vix_quantile)
 
-    #3. vix has spiked
-    cond_3 = df['vix'] > df['vix'].shift(interval) + spike
+    #2. vix has spiked
+    cond_2 = df['vix'] - df['vix'].rolling(interval).mean() > df['vix'].rolling(interval).std()
 
-    res = np.where(cond_1 | cond_3, 1, 0)
+    res = np.where(cond_1 | cond_2, 1, 0)
 
     return res
     
 df = pd.concat([usmv, sphb, vix], axis = 1, join = 'inner')
 
-df['hold_usmv'] = hold_usmv(df.vix) 
-df['hold_usmv'] = df['hold_usmv'].shift(1) # 종가기준 매매하면 다음날 수익률부터 반영되게끔 하루 shift
+df['hold_usmv'] = hold_usmv(df.vix)
 df['hold_sphb'] = np.where(df['hold_usmv'] == 1, 0, 1)
+df['hold_usmv'] = df['hold_usmv'].shift(1) # 종가기준 매매하면 다음날 수익률부터 반영되게끔 하루 shift
+df['hold_sphb'] = df['hold_sphb'].shift(1)
 
-vix_filter = df['vix'] == df['vix'].rolling(20).max()
-df['hold_usmv'] = df['hold_usmv'].mask(vix_filter, 0)
-df['hold_sphb'] = df['hold_sphb'].mask(vix_filter, 0)
+# # to expand :
+# 1) VIX 최상위 0.9 에 있을때
+# 2) VIX Term structure Invert 될때 포지션 안 잡는 걸로
+# 3) Inversion but Vix drop 이면 매수
+
 
 df[['usmv_ret', 'sphb_ret']] = df[['usmv', 'sphb']].pct_change(1)
 df['usmv_ret'] = df['usmv_ret'] * df['hold_usmv']
@@ -49,5 +52,13 @@ df['sphb_ret'] = df['sphb_ret'] * df['hold_sphb']
 df['total_ret'] = df['usmv_ret'] + df['sphb_ret']
 df['total_cumret'] = quant.df_cumret(df.total_ret, is_ret = True)
 
-#
+# benchmark
 
+spx = spx.loc[df.index].pct_change(1)
+usmv = usmv.pct_change(1)
+sphb = sphb.pct_change(1)
+strat = df['total_ret']
+
+ret = pd.concat([spx, usmv, sphb, strat], axis = 1, join = 'inner')
+cumret = ret.apply(quant.df_cumret, is_ret = True)
+cumret.plot()

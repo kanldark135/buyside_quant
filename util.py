@@ -1,5 +1,21 @@
 import pandas as pd
 import numpy as np
+from openbb_terminal.sdk import openbb
+import quant
+
+
+def load_stock(tickers : list, start_date = "1909-01-01", end_date = "9999-99-99"):
+
+    for i in tickers:
+
+        df_raw = openbb.stocks.load(i, start_date = start_date)
+        temp = quant.close_only(df_raw, column_rename = i)
+        df = pd.concat([df, temp], axis = 1)
+        df = df.dropna()
+    
+    return df
+
+
 
 def extract_last_price(df, interval = "M"):
 

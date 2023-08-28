@@ -96,9 +96,20 @@ def sharpe(df, rf = 0, is_ret = False):
 def calmar(df : pd.Series, is_ret = False):
     res = cagr(df, is_ret = is_ret) / mdd(df, is_ret = is_ret)
     return -res
+
+def win_rate(df, is_ret = True):
+
+    if is_ret == True:
+        df.loc[df > 0]
+        count = len(df.loc[df > 0])
+    else:
+        ret = df.pct_change(1)
+        ret.loc[ret > 0]
+        count = len(ret.loc[ret > 0])
     
+    res = count / np.count_nonzero(df)
 
-
+    return res
 
 class ta:
 
