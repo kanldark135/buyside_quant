@@ -8,38 +8,67 @@ import pandas as pd
 import numpy as np
 from datetime import datetime as dt
 
-df_stocks = pd.DataFrame()
+df = pd.DataFrame()
 
 start_date = '2010-01-01'
-stocks = ['SPY', 'AAPL', 'MSFT', 'TLT', 'JPM', 'BAC', 'MRNA', 'META', 'WMT']
-for i in stocks:
-
-    df_raw = openbb.stocks.load(i, start_date = start_date)
-    df = quant.close_only(df_raw, column_rename = i)
-    df = util.extract_last_price(df)
-    df_stocks = pd.concat([df_stocks, df], axis = 1)
-
+stocks = ['SPY', 'AAPL', 'MSFT', 'TLT', 'JPM', 'BAC', 'MRNA', 'META', 'WMT', 'BIL']
+df = util.load_stock(stocks)
 
 # momentum_score 계산
 
-def momentum(df, list_months : list = [1, 3, 6, 12]):
+def momentum(df, interval = "M", list_months : list = [1, 3, 6, 12]):
 
-    ''' 일단 n-month 수익률로만 진행 '''
+    df_dummy = pd.DataFrame()
+    for i in list_months:
+        df_dummy[f"ret_{i}"] = df.resample(interval).\
+            last().\
+            dropna().\
+            pct_change(i)
+    df_dummy.index = util.extract_last_price(df, interval = interval).index
+
+    dummy = list(reversed(list_months))
+    
+    res = df_dummy.loc[:, f'ret_{list_months[0]}': ].mul(dummy, axis = 1)
+    res = res.sum(axis = 1) / sum(list_months)
+    return res
+
+df_momentum_score = df.apply(momentum)
+
+#1. absolute momentum
+df_abs_momentum = df_momentum_score.apply(lambda x : np.where(x > 0, 1 , 0)) # 공매도 없이 롱만 취한다는 가정 하여 abs momentum > 0
+
+# 2. relative momentum 
+def rank_function(score, top_n = 3):
+    rank = score.rank(axis = 1, method = 'max', ascending = "False")
+    selected_rank = rank.where(rank > len(stocks) - top_n, 0)
+    return selected_rank
+
+df_momentum_rank = rank_function(df_momentum_score)
+
+#3. 변동성
+def volatility(df, interval = 'D', list_months : list = [20, 60, 126, 252]):
+
     df_dummy = pd.DataFrame()
 
     for i in list_months:
-        df_dummy[f"ret_{i}"] = df.pct_change(i)
+        df_dummy[f'vol_{i}'] = df.\
+            pct_change(1).\
+            rolling(i).\
+            std() * np.sqrt(252)
 
     dummy = list(reversed(list_months))
-    res = df_dummy.loc[:, f'ret_{list_months[0]}': ].mul(dummy, axis = 1)
-
+    res = df_dummy.loc[:, f'vol_{list_months[0]}': ].mul(dummy, axis = 1)
     res = res.sum(axis = 1) / sum(list_months)
-
     return res
+
+df_vol_score = df.apply(volatility)
+df
+
+#4. correlation score : sum of all the correl coefficient wrt other assets
+
+df_correl = df.pct_change(1).corr().sum() - 1
+
     
-
-
-
 def put_trade(df : pd.DataFrame):
     
     df['trade'] = 0
