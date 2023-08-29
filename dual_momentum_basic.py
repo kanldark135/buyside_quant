@@ -10,65 +10,106 @@ from datetime import datetime as dt
 
 df = pd.DataFrame()
 
-start_date = '2010-01-01'
+start_date = '2009-01-01'
 stocks = ['SPY', 'AAPL', 'MSFT', 'TLT', 'JPM', 'BAC', 'MRNA', 'META', 'WMT', 'BIL']
-df = util.load_stock(stocks)
+df = util.load_stocks(stocks, start_date = start_date)
 
 # momentum_score 계산
-
-def momentum(df, interval = "M", list_months : list = [1, 3, 6, 12]):
+def momentum_score(df, resample_by = "M", interval : list = [1, 3, 6, 12]):
 
     df_dummy = pd.DataFrame()
-    for i in list_months:
-        df_dummy[f"ret_{i}"] = df.resample(interval).\
-            last().\
-            dropna().\
-            pct_change(i)
-    df_dummy.index = util.extract_last_price(df, interval = interval).index
+    for i in interval:
+        df_dummy[f"ret_{i}"] = df.resample(resample_by) \
+            .last() \
+            .dropna(how = 'all') \
+            .pct_change(i)
+    df_dummy.index = util.extract_last_price(df, interval = resample_by).index
 
-    dummy = list(reversed(list_months))
+    dummy = list(reversed(interval))
     
-    res = df_dummy.loc[:, f'ret_{list_months[0]}': ].mul(dummy, axis = 1)
-    res = res.sum(axis = 1) / sum(list_months)
+    res = df_dummy.loc[:, f'ret_{interval[0]}': ].mul(dummy, axis = 1)
+    res = res.sum(axis = 1) / sum(interval)
     return res
 
-df_momentum_score = df.apply(momentum)
+df_momentum_score = df.apply(momentum_score)
 
 #1. absolute momentum
 df_abs_momentum = df_momentum_score.apply(lambda x : np.where(x > 0, 1 , 0)) # 공매도 없이 롱만 취한다는 가정 하여 abs momentum > 0
 
 # 2. relative momentum 
-def rank_function(score, top_n = 3):
-    rank = score.rank(axis = 1, method = 'max', ascending = "False")
+def rank_function(score, top_n = 3, ascending = True):
+
+    rank = score.rank(axis = 1, method = 'max', ascending = ascending)
+
     selected_rank = rank.where(rank > len(stocks) - top_n, 0)
     return selected_rank
 
-df_momentum_rank = rank_function(df_momentum_score)
+df_momentum_rank = rank_function(df_momentum_score).resample("1D").ffill()
 
 #3. 변동성
-def volatility(df, interval = 'D', list_months : list = [20, 60, 126, 252]):
+def volatility_score(df, resample_by = 'D', interval : list = [20, 60, 126, 252]):
 
     df_dummy = pd.DataFrame()
 
-    for i in list_months:
-        df_dummy[f'vol_{i}'] = df.\
-            pct_change(1).\
-            rolling(i).\
-            std() * np.sqrt(252)
+    for i in interval:
+        df_dummy[f'vol_{i}'] = df\
+            .pct_change(1)\
+            .rolling(i)\
+            .std()\
+            .dropna(how = 'all')\
+            * np.sqrt(252)
 
-    dummy = list(reversed(list_months))
-    res = df_dummy.loc[:, f'vol_{list_months[0]}': ].mul(dummy, axis = 1)
-    res = res.sum(axis = 1) / sum(list_months)
+    dummy = list(reversed(interval))
+    res = df_dummy.loc[:, f'vol_{interval[0]}': ].mul(dummy, axis = 1)
+    res = res.sum(axis = 1) / sum(interval)
     return res
 
-df_vol_score = df.apply(volatility)
-df
+df_vol_score = df.apply(volatility_score)
+df_vol_rank = rank_function(df_vol_score, ascending = False)
 
 #4. correlation score : sum of all the correl coefficient wrt other assets
+def correlation_score(df, resample_by = 'D', interval : list = [20, 60, 126, 252]):
 
-df_correl = df.pct_change(1).corr().sum() - 1
-
+    ''' correl 은 각 list_month 별로 일자 / 종목 df 생성되므로 다른 계산 대비 한 차원 높음-> 계산하려면 n개의 list month 의 df를 모두 더해서 
+    다시 산출 필요'''
     
+    df_dummy = list()
+    reversed_month = list(reversed(interval))
+
+    for i in interval:
+
+        multiplier = reversed_month[interval.index(i)]
+        df_dummy.append(
+            multiplier *  # 계산일수의 역수
+            (df.pct_change(1)\
+            .rolling(i)\
+            .corr()\
+            .dropna(how = 'all')
+            .sum(axis = 1) - 1)\
+            .unstack(level = 1)
+        )
+
+    res = sum(df_dummy).dropna() / sum(interval)
+    return res
+
+df_correl_score = correlation_score(df)
+df_correl_rank = rank_function(df_correl_score, ascending = False)
+
+df_agg_rank = df_abs_momentum.multiply(df_momentum_rank) \
+    + df_abs_momentum.multiply(df_vol_rank) \
+    + df_abs_momentum.multiply(df_correl_rank)
+
+
+
+
+
+
+
+
+
+
+
+
 def put_trade(df : pd.DataFrame):
     
     df['trade'] = 0
@@ -93,8 +134,6 @@ def put_trade(df : pd.DataFrame):
     df['trade'] = df['trade'].shift(1)
 
     return df
-
-res = df.pipe(abs_momentum).pipe(put_trade)
 
 def get_return(df):
     daily_ret = df['close'].pct_change(1) * df['trade']

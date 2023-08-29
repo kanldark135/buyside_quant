@@ -4,7 +4,12 @@ from openbb_terminal.sdk import openbb
 import quant
 
 
-def load_stock(tickers : list, start_date = "1909-01-01", end_date = "9999-99-99"):
+def load_stocks(tickers : list, start_date = "1909-01-01", end_date = "2099-01-01"):
+
+    start_date = pd.to_datetime(start_date)
+    end_date = pd.to_datetime(end_date)
+
+    df = pd.DataFrame()
 
     for i in tickers:
 
