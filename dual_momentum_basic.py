@@ -2,7 +2,7 @@ from openbb_terminal.sdk import openbb
 import FinanceDataReader as fdr
 
 import quant
-import util
+import func
 import backtesting as bt
 import pandas as pd
 import numpy as np
@@ -11,30 +11,28 @@ from datetime import datetime as dt
 df = pd.DataFrame()
 
 start_date = '2009-01-01'
-stocks = ['SPY', 'AAPL', 'MSFT', 'TLT', 'JPM', 'BAC', 'MRNA', 'META', 'WMT', 'BIL']
-df = util.load_stocks(stocks, start_date = start_date)
+stocks = ['SPY', 'AAPL', 'MSFT', 'TLT', 'JPMp', 'BAC', 'MRNA', 'META', 'WMT', 'BIL']
+df = func.load_stocks(stocks, start_date = start_date)
 
 # momentum_score 계산
 def momentum_score(df, resample_by = "M", interval : list = [1, 3, 6, 12]):
-
+    
+    dummy = list(reversed(interval))
     df_dummy = pd.DataFrame()
-    for i in interval:
-        df_dummy[f"ret_{i}"] = df.resample(resample_by) \
+    for int in interval:
+        df_dummy[f"ret_{int}"] = df.resample(resample_by) \
             .last() \
             .dropna(how = 'all') \
-            .pct_change(i)
-    df_dummy.index = util.extract_last_price(df, interval = resample_by).index
-
-    dummy = list(reversed(interval))
-    
-    res = df_dummy.loc[:, f'ret_{interval[0]}': ].mul(dummy, axis = 1)
+            .pct_change(int)
+    df_dummy.index = func.extract_last_price(df, interval = resample_by).index
+    res = df_dummy.mul(dummy, axis = 1)
     res = res.sum(axis = 1) / sum(interval)
     return res
 
 df_momentum_score = df.apply(momentum_score)
 
 #1. absolute momentum
-df_abs_momentum = df_momentum_score.apply(lambda x : np.where(x > 0, 1 , 0)) # 공매도 없이 롱만 취한다는 가정 하여 abs momentum > 0
+df_abs_momentum = df_momentum_score.aply(lambda x : np.where(x > 0, 1 , 0)) # 공매도 없이 롱만 취한다는 가정 하여 abs momentum > 0
 
 # 2. relative momentum 
 def rank_function(score, top_n = 3, ascending = True):
@@ -49,18 +47,25 @@ df_momentum_rank = rank_function(df_momentum_score).resample("1D").ffill()
 #3. 변동성
 def volatility_score(df, resample_by = 'D', interval : list = [20, 60, 126, 252]):
 
+    annuity = {
+        "D" : 252,
+        "W" : 52,
+        "M" : 12,
+        "Y" : 1
+    }
+    dummy = list(reversed(interval))
     df_dummy = pd.DataFrame()
 
-    for i in interval:
-        df_dummy[f'vol_{i}'] = df\
-            .pct_change(1)\
-            .rolling(i)\
-            .std()\
-            .dropna(how = 'all')\
-            * np.sqrt(252)
-
-    dummy = list(reversed(interval))
-    res = df_dummy.loc[:, f'vol_{interval[0]}': ].mul(dummy, axis = 1)
+    for int in interval:
+        df_dummy[f'vol_{int}'] = df.resample(resample_by) \
+            .last() \
+            .dropna(how = 'all') \
+            .pct_change(1) \
+            .rolling(int) \
+            .std() \
+            .dropna(how = 'all') \
+            * np.sqrt(annuity.get(resample_by))
+    res = df_dummy.mul(dummy, axis = 1)
     res = res.sum(axis = 1) / sum(interval)
     return res
 
@@ -76,16 +81,18 @@ def correlation_score(df, resample_by = 'D', interval : list = [20, 60, 126, 252
     df_dummy = list()
     reversed_month = list(reversed(interval))
 
-    for i in interval:
-
-        multiplier = reversed_month[interval.index(i)]
+    for int in interval:
+        multiplier = reversed_month[interval.index(int)]
         df_dummy.append(
             multiplier *  # 계산일수의 역수
-            (df.pct_change(1)\
-            .rolling(i)\
-            .corr()\
-            .dropna(how = 'all')
-            .sum(axis = 1) - 1)\
+            (df.resample(resample_by) \
+            .last() \
+            .dropna(how = 'all') \
+            .pct_change(1) \
+            .rolling(int) \
+            .corr() \
+            .dropna(how = 'all') \
+            .sum(axis = 1) - 1) \
             .unstack(level = 1)
         )
 
