@@ -11,8 +11,8 @@ from datetime import datetime as dt
 df = pd.DataFrame()
 
 start_date = '2009-01-01'
-stocks = ['SPY', 'AAPL', 'MSFT', 'TLT', 'JPMp', 'BAC', 'MRNA', 'META', 'WMT', 'BIL']
-df = func.load_stocks(stocks, start_date = start_date)
+stocks = ['SPY', 'AAPL', 'MSFT', 'TLT', 'JPM', 'BAC', 'MRNA', 'META', 'WMT', 'BIL']
+df = func.load_stocks(stocks, drop_na_date = True, start_date = start_date)
 
 # momentum_score 계산
 def momentum_score(df, resample_by = "M", interval : list = [1, 3, 6, 12]):

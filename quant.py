@@ -17,7 +17,12 @@ def close_only(df, column_rename = 'close'):
             else:
                 raise KeyError("Adj Close / Close / Last_Price 형태의 종가가 dataframe 에 존재하도록 하거나 그냥 종가 한줄 넣으세요")
     
-    df = df.to_frame()
+    # 이미 DataFrame 인 경우 
+    try:
+        df = df.to_frame()
+    except AttributeError:
+        df = df
+        
     df.columns = [column_rename]
     return df
 
