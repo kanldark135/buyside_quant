@@ -39,11 +39,10 @@ def extract_last_price(df, interval = "M"):
         return res
     
     # 3. 원래 가격 df 에서 마지막 날만 reindex로 filtering. df.filter(items = last_days, axis = 0 도 동일)
-    last_days = grouped.apply(extract_last_day).dropna().values
+    last_days = grouped.apply(extract_last_day).dropna().iloc[:, 0]
     df_reindexed = df.reindex(last_days)
 
     return df_reindexed
-
 
 def extract_first_price(df, interval = "M"):
 
@@ -52,15 +51,16 @@ def extract_first_price(df, interval = "M"):
     # 1. year - month 별로 그룹핑된 groupby object 생성
     grouped = df.resample(interval)
     
-    # 2. last day 뽑아내는 함수 및 적용
-    def extract_first_day(grouped):
-        if not grouped.empty:
-            return grouped.iloc[[-1]].index
-
-        # downsampling 하게되면 index[-1] 사용
+    # 2. first day 뽑아내는 함수 및 적용
+    def extract_first_day(one_group):
+        try:
+            res = one_group.iloc[[0]].index
+        except:
+            res = np.nan
+        return res
     
     # 3. 원래 가격 df 에서 마지막 날만 reindex로 filtering. df.filter(items = last_days, axis = 0 도 동일)
-    first_days = grouped.apply(extract_first_day).dropna().values
+    first_days = grouped.apply(extract_first_day).dropna().iloc[:, 0]
     df_reindexed = df.reindex(first_days)
 
     return df_reindexed

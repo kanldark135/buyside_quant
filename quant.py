@@ -31,20 +31,31 @@ def df_cumret(df, is_ret = False):
     if is_ret == True:
         cumret = (df + 1).cumprod() - 1
     else:
-        ret = df.pct_change(1).iloc[1:]
+        ret = df.pct_change(1)
+        ret.iloc[0] = 0
         cumret = (ret + 1).cumprod() - 1
     return cumret
 
-def cagr(df, is_ret = False):
+def cagr(df, interval = 'D', is_ret = False):
+
     ''' df 는 종가거나 여타 가격이어야만 함 / df가 수익률인 경우 is_ret = True로 표기.
-    CAGR 은 일수익률 -> 252일화'''
+    interval : 'D', 'BD', 'W', 'M', 'Y' 으로 df 데이터의 interval 에 따라 정의'''
+
+    interval_dict = {'D' : 365,
+                     'BD' : 252,
+                     'W' : 52,
+                     'M' : 12,
+                     'Y' : 1
+                     }
+
     if is_ret == True:
         cumret = (df + 1).cumprod()
-        cagr = cumret[-1] ** (252 / len(df)) - 1
+        cagr = cumret[-1] ** (interval_dict.get(interval) / len(df)) - 1
     else:
-        ret = df.pct_change(1).iloc[1:]
-        cumret = (ret + 1).cumprod()
-        cagr = cumret[-1] ** (252 / len(ret)) - 1
+        ret = df.pct_change(1)
+        ret.iloc[0] = 0
+        cumret = (ret + 1).cumprod() - 1
+        cagr = cumret[-1] ** (interval_dict.get(interval) / len(ret)) - 1
     return cagr
 
 def df_drawdown(df, is_ret = False):
@@ -68,18 +79,29 @@ def mdd(df, is_ret = False):
     mdd = mdd_rolling.min()
     return mdd
 
-def annual_vol(df, is_ret = False):
-    ''' df 는 종가거나 여타 가격이어야만 함 / df가 수익률인 경우 is_ret = True로 표기'''
+def annual_vol(df, interval = 'D', is_ret = False):
+    ''' df 는 종가거나 여타 가격이어야만 함 / df가 수익률인 경우 is_ret = True로 표기.
+    interval : 'D', 'BD', 'W', 'M', 'Y' 으로 df 데이터의 interval 에 따라 정의'''
+
+    interval_dict = {'D' : 365,
+                     'BD' : 252,
+                     'W' : 52,
+                     'M' : 12,
+                     'Y' : 1
+                     }
+
     if is_ret == True:
-        vol = df.std() * np.sqrt(252)
+        vol = df.std() * np.sqrt(interval_dict.get(interval))
     else:
         ret = df.pct_change(1).iloc[1:]
-        vol = ret.std() * np.sqrt(252)
+        vol = ret.std() * np.sqrt(interval_dict.get(interval))
     return vol
     
 def sharpe(df, rf = 0, is_ret = False):
     ''' df 는 종가거나 여타 가격이어야만 함 / df가 수익률인 경우 is_ret = True로 표기.
-    Morningstar 방법론 적용 (CAGR 가 아니라 월 초과수익률들의 산술평균 / 월 초과수익률들의 월변동성) 으로 계산monthly arithmetic return / monthly stdev -> : following Morningstar Method
+    Morningstar 방법론 적용 (CAGR 가 아니라 월 초과수익률들의 산술평균 / 월 초과수익률들의 월변동성) 으로 계산
+    수익률은 전부 Monthly 로 resampling 실시
+
     https://awgmain.morningstar.com/webhelp/glossary_definitions/mutual_fund/mfglossary_Sharpe_Ratio.html'''
     
     rf = rf / 12
@@ -90,7 +112,8 @@ def sharpe(df, rf = 0, is_ret = False):
         std = np.sqrt((monthly_ret - mu - rf).pipe(np.power, 2).sum() / (len(monthly_ret) - 1))
         sharpe = mu / std     
     else:
-        ret = df.pct_change(1).iloc[1:]
+        ret = df.pct_change(1)
+        ret.iloc[0] = 0
         monthly_ret = ((ret + 1).resample("M").prod() - rf) -   1
         mu = monthly_ret.mean() # CAGR 가 아니라 단순 산술평균
         std = np.sqrt((monthly_ret - mu - rf).pipe(np.power, 2).sum() / (len(monthly_ret) - 1))
@@ -98,9 +121,13 @@ def sharpe(df, rf = 0, is_ret = False):
 
     return sharpe
 
-def calmar(df : pd.Series, is_ret = False):
-    res = cagr(df, is_ret = is_ret) / mdd(df, is_ret = is_ret)
+def calmar(df : pd.Series, interval = 'D', is_ret = False):
+    res = cagr(df, interval = interval, is_ret = is_ret) / mdd(df, is_ret = is_ret)
     return -res
+
+def information(df, df_bm, interval = 'D', is_ret = False):
+    res = (cagr(df, interval = interval, is_ret = is_ret) - cagr(df_bm, interval = interval, is_ret = is_ret)) / annual_vol(df - df_bm, interval = interval, is_ret = is_ret)
+    return res
 
 def win_rate(df, is_ret = True):
 
@@ -113,8 +140,37 @@ def win_rate(df, is_ret = True):
         count = len(ret.loc[ret > 0])
     
     res = count / np.count_nonzero(df)
-
     return res
+
+def period_return(df, interval = 'Y', is_ret = False):
+    ''' Convert index to datetime / timestamp format, otherwise return error'''
+    try:
+        df.index = pd.to_datetime(df.index)
+    except:
+        raise TypeError("Index must be in time format")
+    
+    grouped = df.resample(interval)
+    res = grouped.apply(lambda x : df_cumret(x, is_ret = is_ret).iloc[-1])
+    return res
+
+def summary(df_ret, df_bm = None, interval = 'D', rf = 0, is_ret = True):
+
+    ''' ['ret', 'cumret', 'total_ret', 'cagr', 'annual_stdev', 'mdd', 'sharpe', 'information', 'calmar', 'win_rate] '''
+    
+    dummy_dict = {
+        'ret' : df_ret,
+        'cumret' : df_cumret(df_ret, is_ret = is_ret),
+        'total_ret' : df_cumret(df_ret, is_ret = is_ret).iloc[:-1].values,
+        'cagr' : cagr(df_ret, interval = interval, is_ret = is_ret),
+        'annual_stdev' : annual_vol(df_ret, interval = interval, is_ret = is_ret),
+        'mdd' : mdd(df_ret, is_ret = is_ret),
+        'sharpe' : sharpe(df_ret, rf = 0, is_ret = is_ret),
+        'information' : information(df_ret, df_bm, interval = interval, is_ret = is_ret),
+        'calmar' : calmar(df_ret, interval = interval, is_ret = is_ret),
+        'win_rate' : win_rate(df_ret, is_ret = is_ret)
+    }
+
+    return dummy_dict
 
 class ta:
 
